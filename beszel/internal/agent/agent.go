@@ -1,4 +1,4 @@
-// Package agent handles the agent's SSH server and system stats collection.
+// Paket agent, ajan'ın SSH sunucusunu ve sistem istatistikleri toplamasını yönetir.
 package agent
 
 import (
@@ -13,18 +13,18 @@ import (
 )
 
 type Agent struct {
-	debug            bool                       // true if LOG_LEVEL is set to debug
-	zfs              bool                       // true if system has arcstats
-	memCalc          string                     // Memory calculation formula
-	fsNames          []string                   // List of filesystem device names being monitored
-	fsStats          map[string]*system.FsStats // Keeps track of disk stats for each filesystem
-	netInterfaces    map[string]struct{}        // Stores all valid network interfaces
-	netIoStats       system.NetIoStats          // Keeps track of bandwidth usage
-	dockerManager    *dockerManager             // Manages Docker API requests
-	sensorsContext   context.Context            // Sensors context to override sys location
-	sensorsWhitelist map[string]struct{}        // List of sensors to monitor
-	systemInfo       system.Info                // Host system info
-	gpuManager       *GPUManager                // Manages GPU data
+	debug            bool                       // LOG_LEVEL debug olarak ayarlandığında true
+	zfs              bool                       // Sistem arcstats'e sahip olduğunda true
+	memCalc          string                     // Bellek hesaplama formülü
+	fsNames          []string                   // İzlenen dosya sistemi cihaz adlarının listesi
+	fsStats          map[string]*system.FsStats // Her dosya sistemi için disk istatistiklerini takip eder
+	netInterfaces    map[string]struct{}        // Tüm geçerli ağ arayüzlerini saklar
+	netIoStats       system.NetIoStats          // Bant genişliği kullanımını takip eder
+	dockerManager    *dockerManager             // Docker API isteklerini yönetir
+	sensorsContext   context.Context            // Sensörler için sys konumunu geçersiz kılmak için sensörler bağlamı
+	sensorsWhitelist map[string]struct{}        // İzlenecek sensörlerin listesi
+	systemInfo       system.Info                // Ana sistem bilgisi
+	gpuManager       *GPUManager                // GPU verilerini yönetir
 }
 
 func NewAgent() *Agent {
@@ -36,7 +36,7 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) Run(pubKey []byte, addr string) {
-	// Set up slog with a log level determined by the LOG_LEVEL env var
+	// LOG_LEVEL ortam değişkeni tarafından belirlenen bir günlük seviyesi ile slog'u ayarlayın
 	if logLevelStr, exists := os.LookupEnv("LOG_LEVEL"); exists {
 		switch strings.ToLower(logLevelStr) {
 		case "debug":
@@ -51,7 +51,7 @@ func (a *Agent) Run(pubKey []byte, addr string) {
 
 	slog.Debug(beszel.Version)
 
-	// Set sensors context (allows overriding sys location for sensors)
+	// Sensörler bağlamını ayarlayın (sensörler için sys konumunu geçersiz kılmaya izin verir)
 	if sysSensors, exists := os.LookupEnv("SYS_SENSORS"); exists {
 		slog.Info("SYS_SENSORS", "path", sysSensors)
 		a.sensorsContext = context.WithValue(a.sensorsContext,
@@ -59,7 +59,7 @@ func (a *Agent) Run(pubKey []byte, addr string) {
 		)
 	}
 
-	// Set sensors whitelist
+	// Sensörler beyaz listesini ayarlayın
 	if sensors, exists := os.LookupEnv("SENSORS"); exists {
 		a.sensorsWhitelist = make(map[string]struct{})
 		for _, sensor := range strings.Split(sensors, ",") {
@@ -69,48 +69,48 @@ func (a *Agent) Run(pubKey []byte, addr string) {
 		}
 	}
 
-	// initialize system info / docker manager
+	// Sistem bilgilerini / docker yöneticisini başlatın
 	a.initializeSystemInfo()
 	a.initializeDiskInfo()
 	a.initializeNetIoStats()
 	a.dockerManager = newDockerManager(a)
 
-	// initialize GPU manager
+	// GPU yöneticisini başlatın
 	if gm, err := NewGPUManager(); err != nil {
 		slog.Debug("GPU", "err", err)
 	} else {
 		a.gpuManager = gm
 	}
 
-	// if debugging, print stats
+	// Eğer debug modundaysa, istatistikleri yazdırın
 	if a.debug {
-		slog.Debug("Stats", "data", a.gatherStats())
+		slog.Debug("İstatistikler", "data", a.gatherStats())
 	}
 
 	a.startServer(pubKey, addr)
 }
 
 func (a *Agent) gatherStats() system.CombinedData {
-	slog.Debug("Getting stats")
+	slog.Debug("İstatistikler alınıyor")
 	systemData := system.CombinedData{
 		Stats: a.getSystemStats(),
 		Info:  a.systemInfo,
 	}
-	slog.Debug("System stats", "data", systemData)
-	// add docker stats
+	slog.Debug("Sistem istatistikleri", "data", systemData)
+	// Docker istatistiklerini ekleyin
 	if containerStats, err := a.dockerManager.getDockerStats(); err == nil {
 		systemData.Containers = containerStats
-		slog.Debug("Docker stats", "data", systemData.Containers)
+		slog.Debug("Docker istatistikleri", "data", systemData.Containers)
 	} else {
-		slog.Debug("Error getting docker stats", "err", err)
+		slog.Debug("Docker istatistikleri alınırken hata oluştu", "err", err)
 	}
-	// add extra filesystems
+	// Ek dosya sistemlerini ekleyin
 	systemData.Stats.ExtraFs = make(map[string]*system.FsStats)
 	for name, stats := range a.fsStats {
 		if !stats.Root && stats.DiskTotal > 0 {
 			systemData.Stats.ExtraFs[name] = stats
 		}
 	}
-	slog.Debug("Extra filesystems", "data", systemData.Stats.ExtraFs)
+	slog.Debug("Ek dosya sistemleri", "data", systemData.Stats.ExtraFs)
 	return systemData
 }

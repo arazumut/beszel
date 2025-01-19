@@ -11,19 +11,21 @@ import (
 )
 
 func main() {
+	// Yeni bir PocketBase uygulaması oluştur
 	app := pocketbase.NewWithConfig(pocketbase.Config{
-		DefaultDataDir: beszel.AppName + "_data",
+		DefaultDataDir: beszel.AppName + "_data", // Varsayılan veri dizini
 	})
-	app.RootCmd.Version = beszel.Version
-	app.RootCmd.Use = beszel.AppName
-	app.RootCmd.Short = ""
+	app.RootCmd.Version = beszel.Version // Uygulama versiyonunu ayarla
+	app.RootCmd.Use = beszel.AppName     // Uygulama adını ayarla
+	app.RootCmd.Short = ""               // Kısa açıklama (boş bırakılmış)
 
-	// add update command
+	// Güncelleme komutunu ekle
 	app.RootCmd.AddCommand(&cobra.Command{
 		Use:   "update",
-		Short: "Update " + beszel.AppName + " to the latest version",
+		Short: beszel.AppName + " uygulamasını en son sürüme güncelle",
 		Run:   hub.Update,
 	})
 
+	// Yeni bir Hub oluştur ve çalıştır
 	hub.NewHub(app).Run()
 }

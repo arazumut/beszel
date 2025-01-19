@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	// handle flags / subcommands
+	// Bayrakları / alt komutları işle
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "-v":
@@ -21,14 +21,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Try to get the key from the KEY environment variable.
+	// Anahtarı KEY ortam değişkeninden almaya çalış.
 	pubKey := []byte(os.Getenv("KEY"))
 
-	// If KEY is not set, try to read the key from the file specified by KEY_FILE.
+	// Eğer KEY ayarlanmamışsa, anahtarı KEY_FILE ile belirtilen dosyadan okumaya çalış.
 	if len(pubKey) == 0 {
-		keyFile, exists := os.LookupEnv("KEY_FILE")
-		if !exists {
-			log.Fatal("Must set KEY or KEY_FILE environment variable")
+		keyFile, varMi := os.LookupEnv("KEY_FILE")
+		if !varMi {
+			log.Fatal("KEY veya KEY_FILE ortam değişkenini ayarlamalısınız")
 		}
 		var err error
 		pubKey, err = os.ReadFile(keyFile)
@@ -38,8 +38,8 @@ func main() {
 	}
 
 	addr := ":45876"
-	if portEnvVar, exists := os.LookupEnv("PORT"); exists {
-		// allow passing an address in the form of "127.0.0.1:45876"
+	if portEnvVar, varMi := os.LookupEnv("PORT"); varMi {
+		// "127.0.0.1:45876" şeklinde bir adres geçilmesine izin ver
 		if !strings.Contains(portEnvVar, ":") {
 			portEnvVar = ":" + portEnvVar
 		}
