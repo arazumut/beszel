@@ -14,7 +14,7 @@ import (
 	"golang.org/x/exp/slog"
 )
 
-// GPUManager manages data collection for GPUs (either Nvidia or AMD)
+// GPUManager, Nvidia veya AMD GPU'lar için veri toplama işlemlerini yönetir
 type GPUManager struct {
 	nvidiaSmi  bool
 	rocmSmi    bool
@@ -22,7 +22,7 @@ type GPUManager struct {
 	mutex      sync.Mutex
 }
 
-// RocmSmiJson represents the JSON structure of rocm-smi output
+// RocmSmiJson, rocm-smi çıktısının JSON yapısını temsil eder
 type RocmSmiJson struct {
 	ID          string `json:"GUID"`
 	Name        string `json:"Card series"`
@@ -33,32 +33,32 @@ type RocmSmiJson struct {
 	Power       string `json:"Current Socket Graphics Package Power (W)"`
 }
 
-// gpuCollector defines a collector for a specific GPU management utility (nvidia-smi or rocm-smi)
+// gpuCollector, belirli bir GPU yönetim aracının (nvidia-smi veya rocm-smi) toplayıcısını tanımlar
 type gpuCollector struct {
 	name  string
 	cmd   *exec.Cmd
-	parse func([]byte) bool // returns true if valid data was found
+	parse func([]byte) bool // geçerli veri bulunduğunda true döner
 }
 
-var errNoValidData = fmt.Errorf("no valid GPU data found") // Error for missing data
+var errNoValidData = fmt.Errorf("geçerli GPU verisi bulunamadı") // Veri eksikliği hatası
 
-// starts and manages the ongoing collection of GPU data for the specified GPU management utility
+// Belirtilen GPU yönetim aracı için veri toplama işlemini başlatır ve yönetir
 func (c *gpuCollector) start() {
 	for {
 		err := c.collect()
 		if err != nil {
 			if err == errNoValidData {
-				slog.Warn(c.name + " found no valid GPU data, stopping")
+				slog.Warn(c.name + " geçerli GPU verisi bulamadı, durduruluyor")
 				break
 			}
-			slog.Warn(c.name+" failed, restarting", "err", err)
+			slog.Warn(c.name+" başarısız oldu, yeniden başlatılıyor", "err", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
 	}
 }
 
-// collect executes the command, parses output with the assigned parser function
+// collect, komutu çalıştırır ve çıktıyı atanmış ayrıştırıcı fonksiyon ile ayrıştırır
 func (c *gpuCollector) collect() error {
 	stdout, err := c.cmd.StdoutPipe()
 	if err != nil {
@@ -84,12 +84,12 @@ func (c *gpuCollector) collect() error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error: %w", err)
+		return fmt.Errorf("tarayıcı hatası: %w", err)
 	}
 	return c.cmd.Wait()
 }
 
-// parseNvidiaData parses the output of nvidia-smi and updates the GPUData map
+// parseNvidiaData, nvidia-smi çıktısını ayrıştırır ve GPUData haritasını günceller
 func (gm *GPUManager) parseNvidiaData(output []byte) bool {
 	fields := strings.Split(string(output), ", ")
 	if len(fields) < 7 {
@@ -108,12 +108,12 @@ func (gm *GPUManager) parseNvidiaData(output []byte) bool {
 				totalMemory, _ := strconv.ParseFloat(fields[4], 64)
 				usage, _ := strconv.ParseFloat(fields[5], 64)
 				power, _ := strconv.ParseFloat(fields[6], 64)
-				// add gpu if not exists
+				// GPU'yu ekle, eğer yoksa
 				if _, ok := gm.GpuDataMap[id]; !ok {
 					name := strings.TrimPrefix(fields[1], "NVIDIA ")
 					gm.GpuDataMap[id] = &system.GPUData{Name: strings.TrimSuffix(name, " Laptop GPU")}
 				}
-				// update gpu data
+				// GPU verisini güncelle
 				gpu := gm.GpuDataMap[id]
 				gpu.Temperature = temp
 				gpu.MemoryUsed = memoryUsage / 1.024
@@ -127,7 +127,7 @@ func (gm *GPUManager) parseNvidiaData(output []byte) bool {
 	return true
 }
 
-// parseAmdData parses the output of rocm-smi and updates the GPUData map
+// parseAmdData, rocm-smi çıktısını ayrıştırır ve GPUData haritasını günceller
 func (gm *GPUManager) parseAmdData(output []byte) bool {
 	var rocmSmiInfo map[string]RocmSmiJson
 	if err := json.Unmarshal(output, &rocmSmiInfo); err != nil || len(rocmSmiInfo) == 0 {
@@ -158,31 +158,31 @@ func (gm *GPUManager) parseAmdData(output []byte) bool {
 	return true
 }
 
-// sums and resets the current GPU utilization data since the last update
+// Mevcut GPU kullanım verilerini toplar ve sıfırlar
 func (gm *GPUManager) GetCurrentData() map[string]system.GPUData {
 	gm.mutex.Lock()
 	defer gm.mutex.Unlock()
 
-	// check for GPUs with the same name
+	// Aynı ada sahip GPU'ları kontrol et
 	nameCounts := make(map[string]int)
 	for _, gpu := range gm.GpuDataMap {
 		nameCounts[gpu.Name]++
 	}
 
-	// copy / reset the data
+	// Veriyi kopyala / sıfırla
 	gpuData := make(map[string]system.GPUData, len(gm.GpuDataMap))
 	for id, gpu := range gm.GpuDataMap {
-		// sum the data
+		// Veriyi topla
 		gpu.Temperature = twoDecimals(gpu.Temperature)
 		gpu.MemoryUsed = twoDecimals(gpu.MemoryUsed)
 		gpu.MemoryTotal = twoDecimals(gpu.MemoryTotal)
 		gpu.Usage = twoDecimals(gpu.Usage / gpu.Count)
 		gpu.Power = twoDecimals(gpu.Power / gpu.Count)
-		// reset the count
+		// Sayacı sıfırla
 		gpu.Count = 1
-		// dereference to avoid overwriting anything else
+		// Başka bir şeyi üzerine yazmamak için referansı kaldır
 		gpuCopy := *gpu
-		// append id to the name if there are multiple GPUs with the same name
+		// Aynı ada sahip birden fazla GPU varsa, isme id ekle
 		if nameCounts[gpu.Name] > 1 {
 			gpuCopy.Name = fmt.Sprintf("%s %s", gpu.Name, id)
 		}
@@ -191,8 +191,8 @@ func (gm *GPUManager) GetCurrentData() map[string]system.GPUData {
 	return gpuData
 }
 
-// detectGPUs returns the GPU brand (nvidia or amd) or an error if none is found
-// todo: make sure there's actually a GPU, not just if the command exists
+// detectGPUs, GPU markasını (nvidia veya amd) döner veya bulunamazsa hata döner
+// todo: Gerçekten bir GPU olup olmadığını kontrol et, sadece komutun var olup olmadığını değil
 func (gm *GPUManager) detectGPUs() error {
 	if err := exec.Command("nvidia-smi").Run(); err == nil {
 		gm.nvidiaSmi = true
@@ -203,10 +203,10 @@ func (gm *GPUManager) detectGPUs() error {
 	if gm.nvidiaSmi || gm.rocmSmi {
 		return nil
 	}
-	return fmt.Errorf("no GPU found - install nvidia-smi or rocm-smi")
+	return fmt.Errorf("GPU bulunamadı - nvidia-smi veya rocm-smi yükleyin")
 }
 
-// startCollector starts the appropriate GPU data collector based on the command
+// startCollector, komuta bağlı olarak uygun GPU veri toplayıcısını başlatır
 func (gm *GPUManager) startCollector(command string) {
 	switch command {
 	case "nvidia-smi":
@@ -229,7 +229,7 @@ func (gm *GPUManager) startCollector(command string) {
 	}
 }
 
-// NewGPUManager creates and initializes a new GPUManager
+// NewGPUManager, yeni bir GPUManager oluşturur ve başlatır
 func NewGPUManager() (*GPUManager, error) {
 	var gm GPUManager
 	if err := gm.detectGPUs(); err != nil {

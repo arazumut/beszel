@@ -12,7 +12,7 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 )
 
-// Sets up the filesystems to monitor for disk usage and I/O.
+// Disk kullanımı ve I/O için izlenecek dosya sistemlerini ayarlar.
 func (a *Agent) initializeDiskInfo() {
 	filesystem := os.Getenv("FILESYSTEM")
 	efPath := "/extra-filesystems"
@@ -20,39 +20,32 @@ func (a *Agent) initializeDiskInfo() {
 
 	partitions, err := disk.Partitions(false)
 	if err != nil {
-		slog.Error("Error getting disk partitions", "err", err)
+		slog.Error("Disk bölümlerini alırken hata oluştu", "err", err)
 	}
 	slog.Debug("Disk", "partitions", partitions)
 
-	// ioContext := context.WithValue(a.sensorsContext,
-	// 	common.EnvKey, common.EnvMap{common.HostProcEnvKey: "/tmp/testproc"},
-	// )
-	// diskIoCounters, err := disk.IOCountersWithContext(ioContext)
-
 	diskIoCounters, err := disk.IOCounters()
 	if err != nil {
-		slog.Error("Error getting diskstats", "err", err)
+		slog.Error("Disk istatistiklerini alırken hata oluştu", "err", err)
 	}
 	slog.Debug("Disk I/O", "diskstats", diskIoCounters)
 
-	// Helper function to add a filesystem to fsStats if it doesn't exist
+	// Dosya sistemini fsStats'a eklemek için yardımcı fonksiyon
 	addFsStat := func(device, mountpoint string, root bool) {
 		key := filepath.Base(device)
 		var ioMatch bool
 		if _, exists := a.fsStats[key]; !exists {
 			if root {
-				slog.Info("Detected root device", "name", key)
-				// Check if root device is in /proc/diskstats, use fallback if not
+				slog.Info("Kök cihaz tespit edildi", "name", key)
+				// Kök cihazın /proc/diskstats içinde olup olmadığını kontrol et, değilse yedek kullan
 				if _, ioMatch = diskIoCounters[key]; !ioMatch {
 					key, ioMatch = findIoDevice(filesystem, diskIoCounters, a.fsStats)
 					if !ioMatch {
-						slog.Info("Using I/O fallback", "device", device, "mountpoint", mountpoint, "fallback", key)
+						slog.Info("I/O yedeği kullanılıyor", "device", device, "mountpoint", mountpoint, "fallback", key)
 					}
 				}
 			} else {
-				// Check if non-root has diskstats and fall back to folder name if not
-				// Scenario: device is encrypted and named luks-2bcb02be-999d-4417-8d18-5c61e660fb6e - not in /proc/diskstats.
-				// However, the device can be specified by mounting folder from luks device at /extra-filesystems/sda1
+				// Kök olmayan cihazın disk istatistiklerinde olup olmadığını kontrol et, değilse klasör adını kullan
 				if _, ioMatch = diskIoCounters[key]; !ioMatch {
 					efBase := filepath.Base(mountpoint)
 					if _, ioMatch = diskIoCounters[efBase]; ioMatch {
@@ -64,7 +57,7 @@ func (a *Agent) initializeDiskInfo() {
 		}
 	}
 
-	// Use FILESYSTEM env var to find root filesystem
+	// FILESYSTEM ortam değişkenini kullanarak kök dosya sistemini bul
 	if filesystem != "" {
 		for _, p := range partitions {
 			if strings.HasSuffix(p.Device, filesystem) || p.Mountpoint == filesystem {
@@ -74,11 +67,11 @@ func (a *Agent) initializeDiskInfo() {
 			}
 		}
 		if !hasRoot {
-			slog.Warn("Partition details not found", "filesystem", filesystem)
+			slog.Warn("Bölüm detayları bulunamadı", "filesystem", filesystem)
 		}
 	}
 
-	// Add EXTRA_FILESYSTEMS env var values to fsStats
+	// EXTRA_FILESYSTEMS ortam değişkeni değerlerini fsStats'a ekle
 	if extraFilesystems, exists := os.LookupEnv("EXTRA_FILESYSTEMS"); exists {
 		for _, fs := range strings.Split(extraFilesystems, ",") {
 			found := false
@@ -89,21 +82,20 @@ func (a *Agent) initializeDiskInfo() {
 					break
 				}
 			}
-			// if not in partitions, test if we can get disk usage
+			// bölümlerde değilse, disk kullanımını alıp alamayacağımızı test et
 			if !found {
 				if _, err := disk.Usage(fs); err == nil {
 					addFsStat(filepath.Base(fs), fs, false)
 				} else {
-					slog.Error("Invalid filesystem", "name", fs, "err", err)
+					slog.Error("Geçersiz dosya sistemi", "name", fs, "err", err)
 				}
 			}
 		}
 	}
 
-	// Process partitions for various mount points
+	// Çeşitli montaj noktaları için bölümleri işle
 	for _, p := range partitions {
-		// fmt.Println(p.Device, p.Mountpoint)
-		// Binary root fallback or docker root fallback
+		// İkili kök yedeği veya docker kök yedeği
 		if !hasRoot && (p.Mountpoint == "/" || (p.Mountpoint == "/etc/hosts" && strings.HasPrefix(p.Device, "/dev"))) {
 			fs, match := findIoDevice(filepath.Base(p.Device), diskIoCounters, a.fsStats)
 			if match {
@@ -112,13 +104,13 @@ func (a *Agent) initializeDiskInfo() {
 			}
 		}
 
-		// Check if device is in /extra-filesystems
+		// Cihazın /extra-filesystems içinde olup olmadığını kontrol et
 		if strings.HasPrefix(p.Mountpoint, efPath) {
 			addFsStat(p.Device, p.Mountpoint, false)
 		}
 	}
 
-	// Check all folders in /extra-filesystems and add them if not already present
+	// /extra-filesystems içindeki tüm klasörleri kontrol et ve henüz eklenmemişse ekle
 	if folders, err := os.ReadDir(efPath); err == nil {
 		existingMountpoints := make(map[string]bool)
 		for _, stats := range a.fsStats {
@@ -135,19 +127,19 @@ func (a *Agent) initializeDiskInfo() {
 		}
 	}
 
-	// If no root filesystem set, use fallback
+	// Kök dosya sistemi ayarlanmadıysa, yedek kullan
 	if !hasRoot {
 		rootDevice, _ := findIoDevice(filepath.Base(filesystem), diskIoCounters, a.fsStats)
-		slog.Info("Root disk", "mountpoint", "/", "io", rootDevice)
+		slog.Info("Kök disk", "mountpoint", "/", "io", rootDevice)
 		a.fsStats[rootDevice] = &system.FsStats{Root: true, Mountpoint: "/"}
 	}
 
 	a.initializeDiskIoStats(diskIoCounters)
 }
 
-// Returns matching device from /proc/diskstats,
-// or the device with the most reads if no match is found.
-// bool is true if a match was found.
+// /proc/diskstats içinden eşleşen cihazı döndürür,
+// veya eşleşme bulunamazsa en çok okuma yapan cihazı döndürür.
+// bool, bir eşleşme bulunursa true döner.
 func findIoDevice(filesystem string, diskIoCounters map[string]disk.IOCountersStat, fsStats map[string]*system.FsStats) (string, bool) {
 	var maxReadBytes uint64
 	maxReadDevice := "/"
@@ -156,7 +148,7 @@ func findIoDevice(filesystem string, diskIoCounters map[string]disk.IOCountersSt
 			return d.Name, true
 		}
 		if d.ReadBytes > maxReadBytes {
-			// don't use if device already exists in fsStats
+			// cihaz zaten fsStats içinde varsa kullanma
 			if _, exists := fsStats[d.Name]; !exists {
 				maxReadBytes = d.ReadBytes
 				maxReadDevice = d.Name
@@ -166,20 +158,20 @@ func findIoDevice(filesystem string, diskIoCounters map[string]disk.IOCountersSt
 	return maxReadDevice, false
 }
 
-// Sets start values for disk I/O stats.
+// Disk I/O istatistikleri için başlangıç değerlerini ayarlar.
 func (a *Agent) initializeDiskIoStats(diskIoCounters map[string]disk.IOCountersStat) {
 	for device, stats := range a.fsStats {
-		// skip if not in diskIoCounters
+		// diskIoCounters içinde değilse atla
 		d, exists := diskIoCounters[device]
 		if !exists {
-			slog.Warn("Device not found in diskstats", "name", device)
+			slog.Warn("Cihaz disk istatistiklerinde bulunamadı", "name", device)
 			continue
 		}
-		// populate initial values
+		// başlangıç değerlerini doldur
 		stats.Time = time.Now()
 		stats.TotalRead = d.ReadBytes
 		stats.TotalWrite = d.WriteBytes
-		// add to list of valid io device names
+		// geçerli io cihaz adları listesine ekle
 		a.fsNames = append(a.fsNames, device)
 	}
 }

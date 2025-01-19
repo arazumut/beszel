@@ -10,10 +10,10 @@ import (
 )
 
 func (a *Agent) initializeNetIoStats() {
-	// reset valid network interfaces
+	// Geçerli ağ arayüzlerini sıfırla
 	a.netInterfaces = make(map[string]struct{}, 0)
 
-	// map of network interface names passed in via NICS env var
+	// NICS ortam değişkeni ile iletilen ağ arayüzü isimlerinin haritası
 	var nicsMap map[string]struct{}
 	nics, nicsEnvExists := os.LookupEnv("NICS")
 	if nicsEnvExists {
@@ -23,30 +23,30 @@ func (a *Agent) initializeNetIoStats() {
 		}
 	}
 
-	// reset network I/O stats
+	// Ağ I/O istatistiklerini sıfırla
 	a.netIoStats.BytesSent = 0
 	a.netIoStats.BytesRecv = 0
 
-	// get intial network I/O stats
+	// İlk ağ I/O istatistiklerini al
 	if netIO, err := psutilNet.IOCounters(true); err == nil {
 		a.netIoStats.Time = time.Now()
 		for _, v := range netIO {
 			switch {
-			// skip if nics exists and the interface is not in the list
+			// Eğer nics varsa ve arayüz listede yoksa atla
 			case nicsEnvExists:
 				if _, nameInNics := nicsMap[v.Name]; !nameInNics {
 					continue
 				}
-			// otherwise run the interface name through the skipNetworkInterface function
+			// Aksi takdirde arayüz ismini skipNetworkInterface fonksiyonundan geçir
 			default:
 				if a.skipNetworkInterface(v) {
 					continue
 				}
 			}
-			slog.Info("Detected network interface", "name", v.Name, "sent", v.BytesSent, "recv", v.BytesRecv)
+			slog.Info("Ağ arayüzü tespit edildi", "isim", v.Name, "gönderilen", v.BytesSent, "alınan", v.BytesRecv)
 			a.netIoStats.BytesSent += v.BytesSent
 			a.netIoStats.BytesRecv += v.BytesRecv
-			// store as a valid network interface
+			// Geçerli bir ağ arayüzü olarak sakla
 			a.netInterfaces[v.Name] = struct{}{}
 		}
 	}
