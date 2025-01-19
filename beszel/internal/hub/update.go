@@ -11,47 +11,47 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Update updates beszel to the latest version
+// Update beszel'i en son sürüme günceller
 func Update(_ *cobra.Command, _ []string) {
 	var latest *selfupdate.Release
 	var found bool
 	var err error
 	currentVersion := semver.MustParse(beszel.Version)
 	fmt.Println("beszel", currentVersion)
-	fmt.Println("Checking for updates...")
+	fmt.Println("Güncellemeler kontrol ediliyor...")
 	updater, _ := selfupdate.NewUpdater(selfupdate.Config{
 		Filters: []string{"beszel_"},
 	})
 	latest, found, err = updater.DetectLatest("henrygd/beszel")
 
 	if err != nil {
-		fmt.Println("Error checking for updates:", err)
+		fmt.Println("Güncellemeleri kontrol ederken hata oluştu:", err)
 		os.Exit(1)
 	}
 
 	if !found {
-		fmt.Println("No updates found")
+		fmt.Println("Güncelleme bulunamadı")
 		os.Exit(0)
 	}
 
-	fmt.Println("Latest version:", latest.Version)
+	fmt.Println("En son sürüm:", latest.Version)
 
 	if latest.Version.LTE(currentVersion) {
-		fmt.Println("You are up to date")
+		fmt.Println("Güncelsiniz")
 		return
 	}
 
 	var binaryPath string
-	fmt.Printf("Updating from %s to %s...\n", currentVersion, latest.Version)
+	fmt.Printf("%s sürümünden %s sürümüne güncelleniyor...\n", currentVersion, latest.Version)
 	binaryPath, err = os.Executable()
 	if err != nil {
-		fmt.Println("Error getting binary path:", err)
+		fmt.Println("Binary yolunu alırken hata oluştu:", err)
 		os.Exit(1)
 	}
 	err = selfupdate.UpdateTo(latest.AssetURL, binaryPath)
 	if err != nil {
-		fmt.Println("Please try rerunning with sudo. Error:", err)
+		fmt.Println("Lütfen sudo ile tekrar deneyin. Hata:", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Successfully updated to %s\n\n%s\n", latest.Version, strings.TrimSpace(latest.ReleaseNotes))
+	fmt.Printf("Başarıyla %s sürümüne güncellendi\n\n%s\n", latest.Version, strings.TrimSpace(latest.ReleaseNotes))
 }

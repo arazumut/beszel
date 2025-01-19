@@ -1,4 +1,5 @@
 // Package users handles user-related custom functionality.
+// Paket users, kullanıcıyla ilgili özel işlevselliği ele alır.
 package users
 
 import (
@@ -11,24 +12,26 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// UserManager, kullanıcı yönetimi için bir yapı tanımlar.
 type UserManager struct {
 	app *pocketbase.PocketBase
 }
 
+// UserSettings, kullanıcı ayarlarını temsil eder.
 type UserSettings struct {
 	ChartTime            string   `json:"chartTime"`
 	NotificationEmails   []string `json:"emails"`
 	NotificationWebhooks []string `json:"webhooks"`
-	// Language             string   `json:"lang"`
 }
 
+// NewUserManager, yeni bir UserManager örneği oluşturur.
 func NewUserManager(app *pocketbase.PocketBase) *UserManager {
 	return &UserManager{
 		app: app,
 	}
 }
 
-// Initialize user role if not set
+// Kullanıcı rolünü başlatır, eğer ayarlanmamışsa varsayılan olarak "user" yapar.
 func (um *UserManager) InitializeUserRole(e *core.RecordEvent) error {
 	if e.Record.GetString("role") == "" {
 		e.Record.Set("role", "user")
@@ -36,51 +39,46 @@ func (um *UserManager) InitializeUserRole(e *core.RecordEvent) error {
 	return e.Next()
 }
 
-// Initialize user settings with defaults if not set
+// Kullanıcı ayarlarını varsayılanlarla başlatır, eğer ayarlanmamışsa.
 func (um *UserManager) InitializeUserSettings(e *core.RecordEvent) error {
 	record := e.Record
-	// intialize settings with defaults
+	// Ayarları varsayılanlarla başlat
 	settings := UserSettings{
-		// Language:             "en",
 		ChartTime:            "1h",
 		NotificationEmails:   []string{},
 		NotificationWebhooks: []string{},
 	}
 	record.UnmarshalJSONField("settings", &settings)
 	if len(settings.NotificationEmails) == 0 {
-		// get user email from auth record
+		// Kullanıcı e-postasını kimlik doğrulama kaydından al
 		if errs := um.app.ExpandRecord(record, []string{"user"}, nil); len(errs) == 0 {
-			// app.Logger().Error("failed to expand user relation", "errs", errs)
 			if user := record.ExpandedOne("user"); user != nil {
 				settings.NotificationEmails = []string{user.GetString("email")}
 			} else {
-				log.Println("Failed to get user email from auth record")
+				log.Println("Kimlik doğrulama kaydından kullanıcı e-postası alınamadı")
 			}
 		} else {
-			log.Println("failed to expand user relation", "errs", errs)
+			log.Println("Kullanıcı ilişkisi genişletilemedi", "hatalar", errs)
 		}
 	}
-	// if len(settings.NotificationWebhooks) == 0 {
-	// 	settings.NotificationWebhooks = []string{""}
-	// }
 	record.Set("settings", settings)
 	return e.Next()
 }
 
-// Custom API endpoint to create the first user.
-// Mimics previous default behavior in PocketBase < 0.23.0 allowing user to be created through the Beszel UI.
+// İlk kullanıcıyı oluşturmak için özel bir API uç noktası.
+// PocketBase < 0.23.0'deki önceki varsayılan davranışı taklit eder ve kullanıcının Beszel UI aracılığıyla oluşturulmasına izin verir.
 func (um *UserManager) CreateFirstUser(e *core.RequestEvent) error {
-	// check that there are no users
+	// Kullanıcı olmadığını kontrol et
 	totalUsers, err := um.app.CountRecords("users")
 	if err != nil || totalUsers > 0 {
-		return e.JSON(http.StatusForbidden, map[string]string{"err": "Forbidden"})
+		return e.JSON(http.StatusForbidden, map[string]string{"err": "Yasak"})
 	}
-	// check that there is only one superuser and the email matches the email of the superuser we set up in initial-settings.go
+	// Sadece bir süper kullanıcı olduğunu ve e-postanın initial-settings.go'da ayarladığımız süper kullanıcının e-postasıyla eşleştiğini kontrol et
 	adminUsers, err := um.app.FindAllRecords(core.CollectionNameSuperusers)
 	if err != nil || len(adminUsers) != 1 || adminUsers[0].GetString("email") != migrations.TempAdminEmail {
-		return e.JSON(http.StatusForbidden, map[string]string{"err": "Forbidden"})
+		return e.JSON(http.StatusForbidden, map[string]string{"err": "Yasak"})
 	}
-	// create first user using supplied email and password in request body
+	// İstek gövdesinde sağlanan e-posta ve şifreyi kullanarak ilk kullanıcıyı oluştur
 	data := struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -89,7 +87,7 @@ func (um *UserManager) CreateFirstUser(e *core.RequestEvent) error {
 		return e.JSON(http.StatusBadRequest, map[string]string{"err": err.Error()})
 	}
 	if data.Email == "" || data.Password == "" {
-		return e.JSON(http.StatusBadRequest, map[string]string{"err": "Bad request"})
+		return e.JSON(http.StatusBadRequest, map[string]string{"err": "Kötü istek"})
 	}
 
 	collection, _ := um.app.FindCollectionByNameOrId("users")
@@ -104,7 +102,7 @@ func (um *UserManager) CreateFirstUser(e *core.RequestEvent) error {
 	if err := um.app.Save(user); err != nil {
 		return e.JSON(http.StatusInternalServerError, map[string]string{"err": err.Error()})
 	}
-	// create superuser using the email of the first user
+	// İlk kullanıcının e-postasını kullanarak süper kullanıcı oluştur
 	collection, _ = um.app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
 	adminUser := core.NewRecord(collection)
 	adminUser.SetEmail(data.Email)
@@ -112,9 +110,9 @@ func (um *UserManager) CreateFirstUser(e *core.RequestEvent) error {
 	if err := um.app.Save(adminUser); err != nil {
 		return e.JSON(http.StatusInternalServerError, map[string]string{"err": err.Error()})
 	}
-	// delete the intial superuser
+	// İlk süper kullanıcıyı sil
 	if err := um.app.Delete(adminUsers[0]); err != nil {
 		return e.JSON(http.StatusInternalServerError, map[string]string{"err": err.Error()})
 	}
-	return e.JSON(http.StatusOK, map[string]string{"msg": "User created"})
+	return e.JSON(http.StatusOK, map[string]string{"msg": "Kullanıcı oluşturuldu"})
 }
