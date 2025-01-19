@@ -52,3 +52,63 @@ The [quick start guide](https://beszel.dev/guide/getting-started) and other docu
 ## License
 
 Beszel is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+Beszel
+Beszel, Docker istatistikleri, geçmiş veriler ve uyarı işlevleri içeren hafif bir sunucu izleme platformudur.
+
+Kullanıcı dostu bir web arayüzüne, basit bir yapılandırmaya sahiptir ve kutudan çıkar çıkmaz kullanıma hazırdır. Otomatik yedekleme, çoklu kullanıcı desteği, OAuth kimlik doğrulama ve API erişimi gibi özellikleri destekler.
+
+
+
+
+
+
+
+
+Özellikler
+Hafif: Lider çözümlere göre daha küçük ve daha az kaynak tüketir.
+Basit: Kolay kurulum, genel internet erişimi gerekmez.
+Docker istatistikleri: Her konteyner için CPU, bellek ve ağ kullanım geçmişini izler.
+Uyarılar: CPU, bellek, disk, bant genişliği, sıcaklık ve durum için yapılandırılabilir uyarılar.
+Çoklu kullanıcı: Kullanıcılar kendi sistemlerini yönetebilir. Yöneticiler sistemleri kullanıcılar arasında paylaşabilir.
+OAuth / OIDC: Birçok OAuth2 sağlayıcısını destekler. Şifre ile kimlik doğrulama devre dışı bırakılabilir.
+Otomatik yedekleme: Verileri disk veya S3 uyumlu depolama alanına kaydedip geri yükleyin.
+REST API: Verilerinizi kendi betikleriniz ve uygulamalarınızda kullanın veya güncelleyin.
+Mimari
+Beszel, iki ana bileşenden oluşur: hub ve agent.
+
+Hub: Bağlı sistemleri görüntülemek ve yönetmek için bir pano sağlayan PocketBase tabanlı bir web uygulamasıdır.
+Agent: İzlemek istediğiniz her sistemde çalışır ve sistem metriklerini hub’a iletmek için minimal bir SSH sunucusu oluşturur.
+Başlarken
+Hızlı başlangıç kılavuzu ve diğer belgeler web sitemizde mevcuttur: beszel.dev. Birkaç dakika içinde kurulumu tamamlayabilirsiniz.
+
+Ekran Görüntüleri
+
+
+
+
+Desteklenen Metrikler
+CPU kullanımı - Ana sistem ve Docker / Podman konteynerleri.
+Bellek kullanımı - Ana sistem ve konteynerler. Swap ve ZFS ARC dahil.
+Disk kullanımı - Ana sistem. Birden fazla bölüm ve cihaz destekler.
+Disk G/Ç - Ana sistem. Birden fazla bölüm ve cihaz destekler.
+Ağ kullanımı - Ana sistem ve konteynerler.
+Sıcaklık - Ana sistem sensörleri.
+GPU kullanımı / sıcaklık / güç tüketimi - Sadece Nvidia ve AMD. İkili agent kullanılması gerekir.
+Lisans
+Beszel, MIT Lisansı ile lisanslanmıştır. Daha fazla ayrıntı için LİSANS dosyasına bakın.
