@@ -31,6 +31,8 @@ func NewUserManager(app *pocketbase.PocketBase) *UserManager {
 	}
 }
 
+// Register, kullanıcı yöneticisini kaydeder.
+
 // Kullanıcı rolünü başlatır, eğer ayarlanmamışsa varsayılan olarak "user" yapar.
 func (um *UserManager) InitializeUserRole(e *core.RecordEvent) error {
 	if e.Record.GetString("role") == "" {

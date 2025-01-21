@@ -11,7 +11,7 @@ var (
 
 func init() {
 	m.Register(func(app core.App) error {
-		// initial settings
+		// başlangıç ayarları
 		settings := app.Settings()
 		settings.Meta.AppName = "Beszel"
 		settings.Meta.HideControls = true
@@ -19,7 +19,7 @@ func init() {
 		if err := app.Save(settings); err != nil {
 			return err
 		}
-		// create superuser
+		// süper kullanıcı oluştur
 		collection, _ := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
 		user := core.NewRecord(collection)
 		user.SetEmail(TempAdminEmail)
